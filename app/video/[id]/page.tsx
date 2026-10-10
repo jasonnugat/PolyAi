@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import Chat from "@/components/Chat";
+import { getSummary } from "@/lib/db/actions/getsummary";
 import Comments from "@/components/Comments";
 import { getComments, type Comment } from "@/lib/db/actions/getcomments";
 
 type Params = Promise<{ id: string }>;
 
-// Liest die ID aus der URL. Läuft in einer <Suspense>-Grenze,
-// damit der Rest der Seite sofort angezeigt werden kann.
 async function VideoPlayer({ params }: { params: Params }) {
   const { id } = await params;
 
@@ -29,7 +28,20 @@ async function VideoPlayer({ params }: { params: Params }) {
   );
 }
 
-// Gibt die Video-ID aus der URL an den Chat weiter
+async function SummarySection({ params }: { params: Params }) {
+  const { id } = await params;
+  const summary = await getSummary(Number(id));
+
+  return (
+    <section className="min-h-64 rounded-lg border border-gray-300 p-4">
+      <h2 className="mb-2 font-semibold">Summary</h2>
+      <p className="whitespace-pre-wrap text-gray-700">
+        {summary || "Keine Zusammenfassung vorhanden."}
+      </p>
+    </section>
+  );
+}
+
 async function ChatSection({ params }: { params: Params }) {
   const { id } = await params;
   return <Chat videoId={id} />;
@@ -64,7 +76,6 @@ async function CommentsSection({ params }: { params: Params }) {
 export default function VideoPage({ params }: { params: Params }) {
   return (
     <main className="min-h-screen bg-white p-6 text-gray-900">
-      {/* Zurück-Pfeil */}
       <Link href="/" className="mb-4 inline-block text-2xl hover:text-gray-500">
         ←
       </Link>
@@ -80,6 +91,17 @@ export default function VideoPage({ params }: { params: Params }) {
             <VideoPlayer params={params} />
           </Suspense>
 
+          <Suspense
+            fallback={
+              <section className="min-h-64 rounded-lg border border-gray-300 p-4">
+                <h2 className="mb-2 font-semibold">Summary</h2>
+                <p className="text-gray-500">
+                  Hier erscheint die Zusammenfassung des Videos.
+                </p>
+              </section>
+            }
+          >
+            <SummarySection params={params} />
           <section className="min-h-64 rounded-lg border border-gray-300 p-4">
             <h2 className="mb-2 font-semibold">Summary</h2>
             <p className="text-gray-500">
@@ -98,7 +120,7 @@ export default function VideoPage({ params }: { params: Params }) {
 
         {/* Rechte Spalte: Chat */}
         <Suspense
-          fallback={<div className="rounded-lg border border-gray-300" />}
+          fallback={<div className="min-h-96 rounded-lg border border-gray-300" />}
         >
           <ChatSection params={params} />
         </Suspense>

@@ -1,5 +1,6 @@
 import OpenAI from "openai";
-import { loadTranscript } from "@/lib/transcript";
+import { loadAllTranscripts } from "@/lib/transcript";
+import { limitTimestamps, wantsDetails } from "@/lib/chatRules";
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -11,38 +12,76 @@ export async function POST(req: Request) {
     messages: Message[];
   };
 
-  let transcript: string;
+  // Alle Transkripte laden, jedes mit "=== Video X ===" gekennzeichnet
+  let library: string;
   try {
-    transcript = await loadTranscript(videoId);
+    const all = await loadAllTranscripts();
+    if (!all.some((v) => v.id === videoId)) throw new Error();
+    library = all
+      .map((v) => `=== Video ${v.id} ===\n${v.transcript}`)
+      .join("\n\n");
   } catch {
-    return Response.json({ error: "Transkript nicht gefunden" }, { status: 404 });
+    return Response.json(
+      { error: "Transkript nicht gefunden" },
+      { status: 404 }
+    );
   }
+
+  // Kurz-Modus (Standard) oder ausführlich, je nach letzter Frage
+  const question = messages.at(-1)?.content ?? "";
+  const detailed = wantsDetails(question);
+
+  const style = detailed
+    ? `- Die Frage verlangt ausdrücklich eine ausführliche Antwort: Erkläre gründlich,
+  Aufzählungen sind erlaubt, nenne alle relevanten Stellen (wichtigste zuerst).`
+    : `- Antworte KNAPP: höchstens 2-3 kurze Sätze, nur das Wichtigste, keine Aufzählungen.
+- Nenne HÖCHSTENS 2 Zeitangaben, die wichtigste zuerst. Zwei Zeitangaben im selben
+  Video müssen mindestens 5 Minuten auseinander liegen.
+- Wenn es deutlich mehr zum Thema gibt, biete am Ende in einem kurzen Satz an,
+  ausführlicher zu werden.`;
 
   try {
     // Erst hier erstellen, damit "npm run build" auch ohne Key funktioniert
     const client = new OpenAI(); // liest OPENAI_API_KEY aus .env.local
     const res = await client.responses.create({
       model: "gpt-6-luna",
-      // Transkript zuerst: bleibt bei jeder Frage gleich -> OpenAI cached es automatisch
-      instructions: `Transkript der Vorlesung (Format: [h:mm:ss] Text):
+      // Die Transkripte stehen zuerst und sind für jedes Video gleich
+      // -> OpenAI cached diesen Teil automatisch über alle Videos hinweg.
+      // Erst danach kommt, welches Video gerade läuft.
+      instructions: `Transkripte aller Vorlesungen (Format: [h:mm:ss] Text):
 
-${transcript}
+${library}
 
 ---
-Du bist ein Lernassistent für diese Vorlesung.
-- Beantworte Fragen nur auf Grundlage des Transkripts oben.
-- Gib zu jeder Aussage die passende Stelle an, exakt im Format [h:mm:ss], z.B. [0:08:52].
-  Verwende nur Zeitangaben, die im Transkript vorkommen.
-- Wenn etwas nicht im Transkript vorkommt, sag das ehrlich.
+Du bist ein Lernassistent für diese Vorlesungsreihe.
+Der/die Studierende schaut gerade Video ${videoId}.
+
+- Beantworte Fragen nur auf Grundlage der Transkripte oben.
+- Beziehe dich zuerst auf das aktuelle Video ${videoId}. Wenn ein Thema in einem
+  anderen Video (auch oder ausführlicher) behandelt wird, verweise zusätzlich darauf.
+- Gib zu jeder Aussage die passende Stelle an, IMMER exakt im Format
+  [Video <Nummer>, h:mm:ss], z.B. [Video ${videoId}, 0:08:52].
+  Verwende nur Videos und Zeitangaben, die in den Transkripten vorkommen.
+- Wenn etwas in keinem Transkript vorkommt, sag das ehrlich.
 - Verwende KEIN LaTeX und kein Markdown. Schreib Formeln als einfachen Text,
   z.B. F(n) = F(n-1) + F(n-2) oder A^99.
-- Antworte kurz und verständlich, in der Sprache der Frage.`,
+- Antworte verständlich, in der Sprache der Frage.
+${style}`,
       input: messages,
     });
 
-    return Response.json({ answer: res.output_text });
+    // Sicherheitsnetz: Im Kurz-Modus max. 2 Zeitangaben, mind. 5 Min. auseinander,
+    // auch wenn sich das Modell nicht daran hält
+    const answer = detailed
+      ? res.output_text
+      : limitTimestamps(res.output_text, videoId);
+
+    return Response.json({ answer });
   } catch (err) {
     console.error(err);
-    return Response.json({ error: "Fehler bei der Anfrage an OpenAI" }, { status: 500 });
+    return Response.json(
+      { error: "Fehler bei der Anfrage an OpenAI" },
+      { status: 500 }
+    );
   }
 }
