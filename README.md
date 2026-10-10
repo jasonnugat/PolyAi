@@ -20,6 +20,14 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Comment voting setup
+
+Voting uses the existing `comment.rank` column. The configured Supabase client needs permission to read comments and update their rank. Conditional updates preserve other visitors' votes when multiple visitors vote at once.
+
+Visitors can upvote, downvote, switch or undo their vote, including on their own comments. Each browser remembers its selection locally because the app has no login. A different browser or cleared browser storage represents a new visitor; this is not account-based vote enforcement.
+
+Comments default to **Top rated**. The dropdown also offers **Newest first** and **Oldest first**.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

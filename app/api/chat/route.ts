@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { loadAllTranscripts } from "@/lib/transcript";
-import { limitTimestamps, wantsDetails } from "@/lib/chatRules";
+import { limitAnswerTimestamps, wantsDetails } from "@/lib/chatRules";
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
       .join("\n\n");
   } catch {
     return Response.json(
-      { error: "Transkript nicht gefunden" },
+      { error: "Transcript not found" },
       { status: 404 }
     );
   }
@@ -33,10 +33,11 @@ export async function POST(req: Request) {
 
   const style = detailed
     ? `- Die Frage verlangt ausdrücklich eine ausführliche Antwort: Erkläre gründlich,
-  Aufzählungen sind erlaubt, nenne alle relevanten Stellen (wichtigste zuerst).`
-    : `- Antworte KNAPP: höchstens 2-3 kurze Sätze, nur das Wichtigste, keine Aufzählungen.
-- Nenne HÖCHSTENS 2 Zeitangaben, die wichtigste zuerst. Zwei Zeitangaben im selben
-  Video müssen mindestens 5 Minuten auseinander liegen.
+  Aufzählungen sind erlaubt, nenne die wichtigsten passenden Stellen zuerst.`
+    : `- Antworte KNAPP: Bei gezielten Einzelfragen reichen normalerweise 2-3 kurze Sätze.
+- Bei Zusammenfassungen beschreibe die wesentlichen Themen jeweils kurz in einem
+  eigenen Absatz mit dem passenden Zeitverweis. Decke die Vorlesung ab, statt nur
+  eine einzige Stelle zu nennen.
 - Wenn es deutlich mehr zum Thema gibt, biete am Ende in einem kurzen Satz an,
   ausführlicher zu werden.`;
 
@@ -57,11 +58,21 @@ Du bist ein Lernassistent für diese Vorlesungsreihe.
 Der/die Studierende schaut gerade Video ${videoId}.
 
 - Beantworte Fragen nur auf Grundlage der Transkripte oben.
-- Beziehe dich zuerst auf das aktuelle Video ${videoId}. Wenn ein Thema in einem
-  anderen Video (auch oder ausführlicher) behandelt wird, verweise zusätzlich darauf.
-- Gib zu jeder Aussage die passende Stelle an, IMMER exakt im Format
+- Beziehe dich zuerst auf das aktuelle Video ${videoId}. Wenn ein anderes Video
+  die Frage besser beantwortet, wähle stattdessen die passende Stelle dort.
+- Mehrere Zeitverweise und Verweise auf andere Videos sind auch bei kurzen
+  Antworten erlaubt, wenn sie unterschiedliche relevante Themen oder Aussagen
+  belegen. Setze jeden Verweis direkt zum zugehörigen Inhalt.
+- Wähle für dieselbe Aussage die eine aussagekräftigste Stelle, statt mehrere
+  ähnliche Belege anzuhängen. Die Zahl der Verweise richtet sich nach den
+  relevanten Inhalten, nicht nach der Antwortlänge.
+- Belege deine Antwort mit passenden Stellen, IMMER exakt im Format
   [Video <Nummer>, h:mm:ss], z.B. [Video ${videoId}, 0:08:52].
   Verwende nur Videos und Zeitangaben, die in den Transkripten vorkommen.
+- Fasse nahe beieinanderliegende Stellen im selben Video zu EINEM Zeitverweis
+  zusammen: Wähle die aussagekräftigste Stelle. Zwischen zwei Zeitangaben im
+  selben Video müssen mindestens 5 Minuten liegen. Das gilt auch bei ausführlichen
+  Antworten; wiederhole einen Zeitverweis nicht für jede einzelne Aussage.
 - Wenn etwas in keinem Transkript vorkommt, sag das ehrlich.
 - Verwende KEIN LaTeX und kein Markdown. Schreib Formeln als einfachen Text,
   z.B. F(n) = F(n-1) + F(n-2) oder A^99.
@@ -70,17 +81,14 @@ ${style}`,
       input: messages,
     });
 
-    // Sicherheitsnetz: Im Kurz-Modus max. 2 Zeitangaben, mind. 5 Min. auseinander,
-    // auch wenn sich das Modell nicht daran hält
-    const answer = detailed
-      ? res.output_text
-      : limitTimestamps(res.output_text, videoId);
+    // Mehrere relevante Verweise behalten; nahe Stellen im selben Video bündeln.
+    const answer = limitAnswerTimestamps(res.output_text, videoId);
 
     return Response.json({ answer });
   } catch (err) {
     console.error(err);
     return Response.json(
-      { error: "Fehler bei der Anfrage an OpenAI" },
+      { error: "Could not get a response. Please try again." },
       { status: 500 }
     );
   }
