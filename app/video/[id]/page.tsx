@@ -95,19 +95,12 @@ export default function VideoPage({ params }: { params: Params }) {
             fallback={
               <section className="min-h-64 rounded-lg border border-gray-300 p-4">
                 <h2 className="mb-2 font-semibold">Summary</h2>
-                <p className="text-gray-500">
-                  Hier erscheint die Zusammenfassung des Videos.
-                </p>
+                <p className="text-gray-400">Wird geladen …</p>
               </section>
             }
           >
             <SummarySection params={params} />
-          <section className="min-h-64 rounded-lg border border-gray-300 p-4">
-            <h2 className="mb-2 font-semibold">Summary</h2>
-            <p className="text-gray-500">
-              Hier erscheint die Zusammenfassung des Videos.
-            </p>
-          </section>
+          </Suspense>
 
           <Suspense
             fallback={
@@ -120,7 +113,9 @@ export default function VideoPage({ params }: { params: Params }) {
 
         {/* Rechte Spalte: Chat */}
         <Suspense
-          fallback={<div className="min-h-96 rounded-lg border border-gray-300" />}
+          fallback={
+            <div className="min-h-96 rounded-lg border border-gray-300" />
+          }
         >
           <ChatSection params={params} />
         </Suspense>
