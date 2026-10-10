@@ -1,12 +1,11 @@
 import { supabase } from '@/lib/db/supabase';
 
-// Entspricht den Spalten der Tabelle "comment"
 export type Comment = {
   id: number;
-  summary: number; // Fremdschlüssel auf die Summary
+  summary: number;
   text: string;
   username: string;
-  timestamp: string; // ISO-String, z. B. "2026-10-10T16:22:00+00:00"
+  timestamp: string;
 };
 
 export async function getComments(id: number): Promise<Comment[]> {
