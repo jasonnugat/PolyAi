@@ -8,8 +8,8 @@ export default function Home() {
   return (
     <main id="main-content" className="library-page">
       <div className="library-heading">
-        <h1>Your lectures.</h1>
-        <p>Watch. Ask. Understand.</p>
+        <h1>Linear Algebra</h1>
+        <p>Lecture recordings, summaries and discussion.</p>
       </div>
 
       <LectureLibrary

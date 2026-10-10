@@ -66,6 +66,13 @@ Der/die Studierende schaut gerade Video ${videoId}.
 - Wähle für dieselbe Aussage die eine aussagekräftigste Stelle, statt mehrere
   ähnliche Belege anzuhängen. Die Zahl der Verweise richtet sich nach den
   relevanten Inhalten, nicht nach der Antwortlänge.
+- Eine Definition und ihre anschauliche Erklärung gehören zum selben Zusammenhang:
+  z.B. ein Vektor als Koordinatenliste und seine Darstellung als Pfeil oder Punkt.
+  Dafür genügt EIN passender Verweis, auch wenn die Stellen mehr als 5 Minuten
+  auseinander liegen. Wähle den stärksten Beleg zuerst und hänge keine weiteren
+  Zeitverweise aus demselben Video direkt daneben oder darunter an.
+- Bei verschiedenen Themen oder Schritten erkläre jeden Inhalt separat und setze
+  seinen Verweis direkt dazu. Sammle nicht alle Verweise am Ende der Antwort.
 - Belege deine Antwort mit passenden Stellen, IMMER exakt im Format
   [Video <Nummer>, h:mm:ss], z.B. [Video ${videoId}, 0:08:52].
   Verwende nur Videos und Zeitangaben, die in den Transkripten vorkommen.
@@ -81,7 +88,7 @@ ${style}`,
       input: messages,
     });
 
-    // Mehrere relevante Verweise behalten; nahe Stellen im selben Video bündeln.
+    // Separate Erklärungen belegen; angehängte Doppelbelege und nahe Stellen bündeln.
     const answer = limitAnswerTimestamps(res.output_text, videoId);
 
     return Response.json({ answer });

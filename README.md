@@ -28,6 +28,18 @@ Visitors can upvote, downvote, switch or undo their vote, including on their own
 
 Comments default to **Top rated**. The dropdown also offers **Newest first** and **Oldest first**.
 
+## LaTeX in summaries
+
+The `summary.text` field supports mathematical LaTeX through KaTeX:
+
+- Inline formulas: `$v \in \mathbb{R}^n$` or `\(v \in \mathbb{R}^n\)`.
+- Display formulas: `$$\|v\| = \sqrt{v_1^2 + v_2^2}$$` or `\[\|v\| = \sqrt{v_1^2 + v_2^2}\]`.
+- Matrices and aligned equations can be used inside display delimiters.
+
+Surrounding text and line breaks are preserved. Invalid expressions stay visible as their original text. Long formulas scroll horizontally, and the summary's **Show more / Show less** controls still apply. This renders mathematical expressions, not complete `.tex` documents.
+
+Summary timestamps such as `[0:33:00]` are clickable and jump to that point in the current lecture. Use `[Video 2, 0:24:00]` to link to another lecture. All chapter markers are kept, and timestamps inside LaTeX expressions remain part of the formula.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
