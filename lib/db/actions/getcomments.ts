@@ -6,20 +6,21 @@ export type Comment = {
   summary: number; // Fremdschlüssel auf die Summary
   text: string;
   username: string;
-  timestamp: string; // ISO-String, z. B. "2026-10-10T16:22:00+00:00"
+  timestamp: string | null; // ISO-String
+  rank: number;
 };
 
 export async function getComments(id: number): Promise<Comment[]> {
   const { data, error } = await supabase
     .from('comment')
-    .select('*')
+    .select('id,summary,text,username,timestamp,rank')
     .eq('summary', id)
-    .order('timestamp', { ascending: false }); // neueste zuerst
-console.log(data)
-console.log("sdfsdf");
+    .order('rank', { ascending: false, nullsFirst: false })
+    .order('timestamp', { ascending: false, nullsFirst: false })
+    .order('id', { ascending: false });
   if (error) {
     throw new Error(error.message);
   }
 
-  return data;
+  return (data ?? []).map((comment) => ({ ...comment, rank: comment.rank ?? 0 }));
 }

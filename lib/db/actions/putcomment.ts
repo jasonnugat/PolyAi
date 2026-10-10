@@ -4,16 +4,17 @@ import { supabase } from '@/lib/db/supabase';
 import type { Comment } from '@/lib/db/actions/getcomments';
 
 export async function addComment(summary: number, text: string): Promise<Comment> {
-  if (!text.trim()) {
-    throw new Error('Text darf nicht leer sein.');
+  if (!Number.isSafeInteger(summary) || summary <= 0 || typeof text !== 'string' || !text.trim()) {
+    throw new Error('A valid lecture and comment are required.');
   }
 
   const { data, error } = await supabase
     .from('comment')
     .insert({
       summary,
-      text,
-      username: "Anonymous"
+      text: text.trim(),
+      username: "Anonymous",
+      rank: 0,
     })
     .select()
     .single();
@@ -22,5 +23,5 @@ export async function addComment(summary: number, text: string): Promise<Comment
     throw new Error(error.message);
   }
 
-  return data;
+  return { ...data, rank: data.rank ?? 0 };
 }

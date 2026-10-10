@@ -1,23 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Icon from "@/components/Icon";
+import { limitAnswerTimestamps } from "@/lib/chatRules";
 
 // error: true = Fehlermeldung, wird nicht an OpenAI mitgeschickt
 type Message = { role: "user" | "assistant"; content: string; error?: boolean };
 
 const STORAGE_KEY = "polyai-chat";
-
-// Springt im Video (id="lecture-video") an die Stelle und spielt ab
-function seekTo(seconds: number) {
-  const video = document.getElementById(
-    "lecture-video"
-  ) as HTMLVideoElement | null;
-  if (!video) return;
-  video.currentTime = seconds;
-  video.play().catch(() => {});
-  video.scrollIntoView({ behavior: "smooth", block: "nearest" });
-}
 
 // Findet "[Video 2, 0:12:30]" und auch das alte Format "[0:12:30]"
 const TIMESTAMP = /(\[(?:Video [\w-]+, )?\d+:\d{2}:\d{2}\])/g;
@@ -31,11 +22,25 @@ export default function Chat({ videoId }: { videoId: string }) {
   const listRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
+  const seekTo = useCallback((seconds: number): boolean => {
+    // Cached routes remain in the DOM, so only target this chat's own player.
+    const video = listRef.current
+      ?.closest(".video-page")
+      ?.querySelector<HTMLVideoElement>("video.lecture-video");
+    if (!video) return false;
+    video.currentTime = seconds;
+    video.play().catch(() => {});
+    video.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    return true;
+  }, []);
+
   // Chat aus dem Browser-Tab laden (bleibt beim Video-Wechsel und Neuladen erhalten,
   // ist weg, sobald der Tab geschlossen wird – keine Datenbank nötig)
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem(STORAGE_KEY);
+      // Restore browser-only session data after the server-rendered first paint.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (saved) setMessages(JSON.parse(saved));
     } catch {
       // z.B. privater Modus: dann startet der Chat einfach leer
@@ -62,12 +67,10 @@ export default function Chat({ videoId }: { videoId: string }) {
     if (!t) return;
 
     const timer = setInterval(() => {
-      if (!document.getElementById("lecture-video")) return; // Video noch nicht geladen
-      clearInterval(timer);
-      seekTo(t);
+      if (seekTo(t)) clearInterval(timer);
     }, 100);
     return () => clearInterval(timer);
-  }, [videoId]);
+  }, [videoId, seekTo]);
 
   // Macht aus jeder Zeitangabe einen klickbaren Button
   function withTimestamps(text: string) {
@@ -84,10 +87,12 @@ export default function Chat({ videoId }: { videoId: string }) {
         return (
           <button
             key={i}
+            type="button"
             onClick={() => seekTo(seconds)}
-            className="mx-0.5 rounded bg-blue-50 px-1.5 font-mono text-sm text-blue-700 hover:bg-blue-100"
+            className="timestamp"
+            aria-label={`Jump to ${time} in the video`}
           >
-            ▶ {time}
+            <Icon name="play" size={12} /> {time}
           </button>
         );
       }
@@ -96,10 +101,12 @@ export default function Chat({ videoId }: { videoId: string }) {
       return (
         <button
           key={i}
+          type="button"
           onClick={() => router.push(`/video/${targetVideo}?t=${seconds}`)}
-          className="mx-0.5 rounded bg-purple-50 px-1.5 font-mono text-sm text-purple-700 hover:bg-purple-100"
+          className="timestamp timestamp--external"
+          aria-label={`Open video ${targetVideo} at ${time}`}
         >
-          ↗ Video {targetVideo} · {time}
+          <Icon name="arrow-up-right" size={12} /> Video {targetVideo} · {time}
         </button>
       );
     });
@@ -143,8 +150,8 @@ export default function Chat({ videoId }: { videoId: string }) {
           { role: "assistant", content: data.answer },
         ]);
       } else {
-        const error = `Fehler ${res.status}: ${
-          data?.error ?? "Route nicht gefunden"
+        const error = `Error ${res.status}: ${
+          data?.error ?? "Request failed."
         }`;
         setMessages([
           ...newMessages,
@@ -156,7 +163,7 @@ export default function Chat({ videoId }: { videoId: string }) {
         ...newMessages,
         {
           role: "assistant",
-          content: "Fehler: Server nicht erreichbar.",
+          content: "Unable to reach the server. Please try again.",
           error: true,
         },
       ]);
@@ -166,29 +173,45 @@ export default function Chat({ videoId }: { videoId: string }) {
   }
 
   return (
-    <aside className="flex h-[32rem] flex-col rounded-lg border border-gray-300 p-4 lg:h-[calc(100vh-7rem)]">
+    <aside className="panel chat-panel" aria-labelledby="chat-title">
       {/* Kopfzeile */}
-      {messages.length > 0 && (
-        <div className="mb-2 flex justify-end">
+      <div className="chat-header">
+        <div className="panel-heading chat-heading">
+          <span className="icon-tile"><Icon name="sparkle" /></span>
+          <div>
+            <h2 id="chat-title" className="panel-title">Lecture assistant</h2>
+            <p className="muted chat-subtitle">Questions about your lecture</p>
+          </div>
+        </div>
+        {messages.length > 0 && (
           <button
+            type="button"
             onClick={newChat}
             disabled={loading}
-            className="text-sm text-gray-500 hover:text-gray-900 disabled:opacity-50"
+            className="icon-button"
+            title="Clear chat"
+            aria-label="Clear chat"
           >
-            Neuer Chat
+            <Icon name="trash" size={18} />
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Nachrichten (scrollbar, wenn es viele werden) */}
       <div
         ref={listRef}
-        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto"
+        className="chat-messages"
+        role="log"
+        aria-label="Chat history"
+        aria-live="polite"
+        aria-relevant="additions"
       >
         {messages.length === 0 && (
-          <p className="m-auto text-center text-sm text-gray-400">
-            Stell eine Frage zur Vorlesung.
-          </p>
+          <div className="chat-empty">
+            <span className="chat-empty-icon"><Icon name="sparkle" size={28} /></span>
+            <h3>Ask about your lecture.</h3>
+            <p>Explore concepts, examples, or key moments.</p>
+          </div>
         )}
 
         {messages.map((m, i) => (
@@ -196,33 +219,50 @@ export default function Chat({ videoId }: { videoId: string }) {
             key={i}
             className={
               m.role === "user"
-                ? "max-w-[80%] self-end rounded-2xl bg-gray-200 px-4 py-2"
+                ? "chat-message chat-message--user"
                 : m.error
-                ? "max-w-[80%] self-start rounded-2xl border border-red-300 bg-red-50 px-4 py-2 text-red-700"
-                : "max-w-[80%] self-start whitespace-pre-wrap rounded-2xl border border-gray-300 px-4 py-2"
+                ? "chat-message chat-message--error"
+                : "chat-message chat-message--assistant"
             }
           >
-            {m.role === "assistant" ? withTimestamps(m.content) : m.content}
+            {m.role === "assistant" && !m.error
+              ? withTimestamps(
+                  limitAnswerTimestamps(
+                    m.content,
+                    videoId,
+                  ),
+                )
+              : m.content}
           </div>
         ))}
 
         {loading && (
-          <div className="self-start rounded-2xl border border-gray-300 px-4 py-2 text-gray-400">
-            …
+          <div className="chat-message chat-message--assistant chat-loading" role="status">
+            Thinking …
           </div>
         )}
       </div>
 
       {/* Eingabe */}
-      <form onSubmit={sendMessage} className="mt-4">
+      <form onSubmit={sendMessage} className="composer chat-composer">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Frage stellen …"
+          placeholder="Ask a question …"
+          aria-label="Question about the lecture"
           disabled={loading}
-          className="w-full rounded-full border border-gray-300 px-4 py-2 outline-none focus:border-gray-500 disabled:bg-gray-50"
+          className="composer-input"
         />
+        <button
+          type="submit"
+          className="send-button"
+          disabled={loading || !input.trim()}
+          aria-label="Send question"
+          title="Send question"
+        >
+          <Icon name="send" size={18} />
+        </button>
       </form>
     </aside>
   );
