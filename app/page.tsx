@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { getVideos } from '@/lib/db/getvideos';
+import { getLectures } from '@/lib/db/actions/getlectures';
 
-// Platzhalter, später kommen die Videos aus Firebase
-const videos = await getVideos();
+const videos = await getLectures();
 
 export default function Home() {
   return (
