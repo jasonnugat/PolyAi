@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 type Cue = { start: number; text: string };
@@ -82,4 +82,20 @@ export async function loadTranscript(id: string): Promise<string> {
   const file = path.join(process.cwd(), "public", "videos", `${id}.vtt`);
   const vtt = await readFile(file, "utf-8");
   return vttToTranscript(vtt);
+}
+
+// Lädt die Transkripte ALLER Videos in public/videos/ (sortiert nach ID: 1, 2, 3, ..., 10)
+export async function loadAllTranscripts(): Promise<
+  { id: string; transcript: string }[]
+> {
+  const dir = path.join(process.cwd(), "public", "videos");
+  const ids = (await readdir(dir))
+    .filter((file) => file.endsWith(".vtt"))
+    .map((file) => file.slice(0, -".vtt".length))
+    .filter((id) => /^[\w-]+$/.test(id))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+  return Promise.all(
+    ids.map(async (id) => ({ id, transcript: await loadTranscript(id) }))
+  );
 }
