@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type Message = { role: "user" | "assistant"; content: string };
+// error: true = Fehlermeldung, wird nicht an OpenAI mitgeschickt
+type Message = { role: "user" | "assistant"; content: string; error?: boolean };
+
+const STORAGE_KEY = "polyai-chat";
 
 // Springt im Video (id="lecture-video") an die Stelle und spielt ab
 function seekTo(seconds: number) {
@@ -22,10 +25,35 @@ const TIMESTAMP_PARTS = /^\[(?:Video ([\w-]+), )?(\d+):(\d{2}):(\d{2})\]$/;
 
 export default function Chat({ videoId }: { videoId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  // Chat aus dem Browser-Tab laden (bleibt beim Video-Wechsel und Neuladen erhalten,
+  // ist weg, sobald der Tab geschlossen wird – keine Datenbank nötig)
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(STORAGE_KEY);
+      if (saved) setMessages(JSON.parse(saved));
+    } catch {
+      // z.B. privater Modus: dann startet der Chat einfach leer
+    }
+    setLoaded(true);
+  }, []);
+
+  // Bei jeder Änderung speichern (erst nach dem Laden, sonst würde [] drüberschreiben)
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    } catch {}
+  }, [messages, loaded]);
+
+  function newChat() {
+    setMessages([]);
+  }
 
   // Kommt man über einen Verweis aus einem anderen Video (z.B. /video/2?t=752),
   // springt das Video an diese Stelle, sobald es auf der Seite ist.
@@ -77,9 +105,10 @@ export default function Chat({ videoId }: { videoId: string }) {
     });
   }
 
-  // Bei neuen Nachrichten automatisch nach unten scrollen
+  // Bei neuen Nachrichten die Chat-Liste nach unten scrollen (nur die Liste, nicht die Seite)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const list = listRef.current;
+    if (list) list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
 
   async function sendMessage(e: React.FormEvent) {
@@ -99,17 +128,37 @@ export default function Chat({ videoId }: { videoId: string }) {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoId, messages: newMessages }),
+        body: JSON.stringify({
+          videoId,
+          // Fehlermeldungen nicht mitschicken, nur echte Fragen und Antworten
+          messages: newMessages
+            .filter((m) => !m.error)
+            .map(({ role, content }) => ({ role, content })),
+        }),
       });
       const data = await res.json().catch(() => null); // null, falls keine JSON-Antwort
-      const answer = res.ok
-        ? data.answer
-        : `Fehler ${res.status}: ${data?.error ?? "Route nicht gefunden"}`;
-      setMessages([...newMessages, { role: "assistant", content: answer }]);
+      if (res.ok) {
+        setMessages([
+          ...newMessages,
+          { role: "assistant", content: data.answer },
+        ]);
+      } else {
+        const error = `Fehler ${res.status}: ${
+          data?.error ?? "Route nicht gefunden"
+        }`;
+        setMessages([
+          ...newMessages,
+          { role: "assistant", content: error, error: true },
+        ]);
+      }
     } catch {
       setMessages([
         ...newMessages,
-        { role: "assistant", content: "Fehler: Server nicht erreichbar." },
+        {
+          role: "assistant",
+          content: "Fehler: Server nicht erreichbar.",
+          error: true,
+        },
       ]);
     } finally {
       setLoading(false);
@@ -118,8 +167,24 @@ export default function Chat({ videoId }: { videoId: string }) {
 
   return (
     <aside className="flex h-[32rem] flex-col rounded-lg border border-gray-300 p-4 lg:h-[calc(100vh-7rem)]">
+      {/* Kopfzeile */}
+      {messages.length > 0 && (
+        <div className="mb-2 flex justify-end">
+          <button
+            onClick={newChat}
+            disabled={loading}
+            className="text-sm text-gray-500 hover:text-gray-900 disabled:opacity-50"
+          >
+            Neuer Chat
+          </button>
+        </div>
+      )}
+
       {/* Nachrichten (scrollbar, wenn es viele werden) */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+      <div
+        ref={listRef}
+        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto"
+      >
         {messages.length === 0 && (
           <p className="m-auto text-center text-sm text-gray-400">
             Stell eine Frage zur Vorlesung.
@@ -132,6 +197,8 @@ export default function Chat({ videoId }: { videoId: string }) {
             className={
               m.role === "user"
                 ? "max-w-[80%] self-end rounded-2xl bg-gray-200 px-4 py-2"
+                : m.error
+                ? "max-w-[80%] self-start rounded-2xl border border-red-300 bg-red-50 px-4 py-2 text-red-700"
                 : "max-w-[80%] self-start whitespace-pre-wrap rounded-2xl border border-gray-300 px-4 py-2"
             }
           >
@@ -144,7 +211,6 @@ export default function Chat({ videoId }: { videoId: string }) {
             …
           </div>
         )}
-        <div ref={bottomRef} />
       </div>
 
       {/* Eingabe */}

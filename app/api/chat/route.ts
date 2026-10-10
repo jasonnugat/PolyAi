@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { loadAllTranscripts } from "@/lib/transcript";
+import { limitTimestamps, wantsDetails } from "@/lib/chatRules";
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -16,10 +17,28 @@ export async function POST(req: Request) {
   try {
     const all = await loadAllTranscripts();
     if (!all.some((v) => v.id === videoId)) throw new Error();
-    library = all.map((v) => `=== Video ${v.id} ===\n${v.transcript}`).join("\n\n");
+    library = all
+      .map((v) => `=== Video ${v.id} ===\n${v.transcript}`)
+      .join("\n\n");
   } catch {
-    return Response.json({ error: "Transkript nicht gefunden" }, { status: 404 });
+    return Response.json(
+      { error: "Transkript nicht gefunden" },
+      { status: 404 }
+    );
   }
+
+  // Kurz-Modus (Standard) oder ausführlich, je nach letzter Frage
+  const question = messages.at(-1)?.content ?? "";
+  const detailed = wantsDetails(question);
+
+  const style = detailed
+    ? `- Die Frage verlangt ausdrücklich eine ausführliche Antwort: Erkläre gründlich,
+  Aufzählungen sind erlaubt, nenne alle relevanten Stellen (wichtigste zuerst).`
+    : `- Antworte KNAPP: höchstens 2-3 kurze Sätze, nur das Wichtigste, keine Aufzählungen.
+- Nenne HÖCHSTENS 2 Zeitangaben, die wichtigste zuerst. Zwei Zeitangaben im selben
+  Video müssen mindestens 5 Minuten auseinander liegen.
+- Wenn es deutlich mehr zum Thema gibt, biete am Ende in einem kurzen Satz an,
+  ausführlicher zu werden.`;
 
   try {
     // Erst hier erstellen, damit "npm run build" auch ohne Key funktioniert
@@ -46,13 +65,23 @@ Der/die Studierende schaut gerade Video ${videoId}.
 - Wenn etwas in keinem Transkript vorkommt, sag das ehrlich.
 - Verwende KEIN LaTeX und kein Markdown. Schreib Formeln als einfachen Text,
   z.B. F(n) = F(n-1) + F(n-2) oder A^99.
-- Antworte kurz und verständlich, in der Sprache der Frage.`,
+- Antworte verständlich, in der Sprache der Frage.
+${style}`,
       input: messages,
     });
 
-    return Response.json({ answer: res.output_text });
+    // Sicherheitsnetz: Im Kurz-Modus max. 2 Zeitangaben, mind. 5 Min. auseinander,
+    // auch wenn sich das Modell nicht daran hält
+    const answer = detailed
+      ? res.output_text
+      : limitTimestamps(res.output_text, videoId);
+
+    return Response.json({ answer });
   } catch (err) {
     console.error(err);
-    return Response.json({ error: "Fehler bei der Anfrage an OpenAI" }, { status: 500 });
+    return Response.json(
+      { error: "Fehler bei der Anfrage an OpenAI" },
+      { status: 500 }
+    );
   }
 }
