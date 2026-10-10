@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import Chat from "@/components/Chat";
+import Comments from "@/components/Comments";
+import { getComments, type Comment } from "@/lib/db/actions/getcomments";
 
 type Params = Promise<{ id: string }>;
 
@@ -33,6 +35,32 @@ async function ChatSection({ params }: { params: Params }) {
   return <Chat videoId={id} />;
 }
 
+// Lädt die Kommentare der Summary serverseitig aus Supabase
+// (die Video-ID aus der URL entspricht der summary-ID)
+async function CommentsSection({ params }: { params: Params }) {
+  const { id } = await params;
+  const summaryId = Number(id);
+
+  let comments: Comment[] = [];
+  try {
+    if (Number.isInteger(summaryId)) {
+      comments = await getComments(summaryId);
+    }
+  } catch (error) {
+    console.error("Kommentare konnten nicht geladen werden:", error);
+    return (
+      <section className="rounded-lg border border-gray-300 p-4">
+        <h2 className="mb-2 font-semibold">Kommentare</h2>
+        <p className="text-sm text-gray-500">
+          Kommentare konnten nicht geladen werden.
+        </p>
+      </section>
+    );
+  }
+
+  return <Comments key={id} initialComments={comments} />;
+}
+
 export default function VideoPage({ params }: { params: Params }) {
   return (
     <main className="min-h-screen bg-white p-6 text-gray-900">
@@ -58,6 +86,14 @@ export default function VideoPage({ params }: { params: Params }) {
               Hier erscheint die Zusammenfassung des Videos.
             </p>
           </section>
+
+          <Suspense
+            fallback={
+              <div className="min-h-48 rounded-lg border border-gray-300" />
+            }
+          >
+            <CommentsSection params={params} />
+          </Suspense>
         </div>
 
         {/* Rechte Spalte: Chat */}
