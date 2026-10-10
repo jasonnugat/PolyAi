@@ -1,6 +1,31 @@
 import Link from "next/link";
+import { Suspense } from "react";
 
-export default function VideoPage() {
+type Params = Promise<{ id: string }>;
+
+// Liest die ID aus der URL. Läuft in einer <Suspense>-Grenze,
+// damit der Rest der Seite sofort angezeigt werden kann.
+async function VideoPlayer({ params }: { params: Params }) {
+  const { id } = await params;
+
+  return (
+    <video
+      src={`/videos/${id}.mp4`}
+      controls
+      className="aspect-video w-full rounded-lg border border-gray-300 bg-black"
+    >
+      <track
+        src={`/videos/${id}.vtt`}
+        kind="subtitles"
+        srcLang="de"
+        label="Deutsch"
+        default
+      />
+    </video>
+  );
+}
+
+export default function VideoPage({ params }: { params: Params }) {
   return (
     <main className="min-h-screen bg-white p-6 text-gray-900">
       {/* Zurück-Pfeil */}
@@ -11,9 +36,13 @@ export default function VideoPage() {
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         {/* Linke Spalte: Video + Summary */}
         <div className="flex flex-col gap-6">
-          <div className="flex aspect-video items-center justify-center rounded-lg border border-gray-300 bg-gray-100">
-            <span className="text-5xl text-gray-500">▶</span>
-          </div>
+          <Suspense
+            fallback={
+              <div className="aspect-video w-full rounded-lg border border-gray-300 bg-gray-100" />
+            }
+          >
+            <VideoPlayer params={params} />
+          </Suspense>
 
           <section className="min-h-64 rounded-lg border border-gray-300 p-4">
             <h2 className="mb-2 font-semibold">Summary</h2>
