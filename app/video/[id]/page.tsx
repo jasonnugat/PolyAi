@@ -58,7 +58,7 @@ async function CommentsSection({ params }: { params: Params }) {
     );
   }
 
-  return <Comments key={id} initialComments={comments} />;
+  return <Comments key={id} summaryId={summaryId} initialComments={comments} />;
 }
 
 export default function VideoPage({ params }: { params: Params }) {

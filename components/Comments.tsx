@@ -1,16 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Comment } from "@/lib/db/actions/getcomments";
+import { addComment } from "@/lib/db/actions/putcomment";
+import { formatAbsolute, timeAgo } from "@/lib/timeAgo";
 
-// "2026-10-10T16:22:00+00:00" -> "10.10.2026, 18:22"
-// Feste Zeitzone, damit Server und Browser dasselbe anzeigen
-function formatDate(iso: string) {
-  return new Intl.DateTimeFormat("de-CH", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: "Europe/Zurich",
-  }).format(new Date(iso));
+// Shows "5 minutes ago" and refreshes itself every 30 seconds
+function TimeAgo({ iso }: { iso: string | null }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (!iso) return null;
+
+  return (
+    // suppressHydrationWarning: server and browser can differ by a few seconds
+    <time
+      dateTime={iso}
+      title={formatAbsolute(iso)}
+      suppressHydrationWarning
+      className="text-xs text-gray-400"
+    >
+      {timeAgo(iso, now)}
+    </time>
+  );
 }
 
 function initials(name: string) {
@@ -23,29 +39,38 @@ function initials(name: string) {
 }
 
 export default function Comments({
+  summaryId,
   initialComments,
 }: {
+  summaryId: number;
   initialComments: Comment[];
 }) {
   const [comments, setComments] = useState<Comment[]>(initialComments);
   const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Nur lokal, wird noch nicht in Supabase gespeichert
-  function addComment(e: React.FormEvent) {
+  // Speichert den Kommentar in Supabase und zeigt ihn danach oben in der Liste
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const text = input.trim();
-    if (!text) return;
-    setComments([
-      {
-        id: -Date.now(), // temporär, bis es einen echten INSERT gibt
-        summary: comments[0]?.summary ?? 0,
-        text,
-        username: "Du",
-        timestamp: new Date().toISOString(),
-      },
-      ...comments,
-    ]);
-    setInput("");
+    if (!text || sending) return;
+
+    setSending(true);
+    setError(null);
+    try {
+      const saved = await addComment(summaryId, text);
+      setComments((prev) => [
+        { ...saved, timestamp: saved.timestamp ?? new Date().toISOString() },
+        ...prev,
+      ]);
+      setInput("");
+    } catch (err) {
+      console.error("Kommentar konnte nicht gespeichert werden:", err);
+      setError("Kommentar konnte nicht gespeichert werden.");
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -55,14 +80,16 @@ export default function Comments({
       </h2>
 
       {/* Eingabe */}
-      <form onSubmit={addComment} className="mb-6">
+      <form onSubmit={handleSubmit} className="mb-6">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Kommentar schreiben …"
-          className="w-full rounded-full border border-gray-300 px-4 py-2 outline-none focus:border-gray-500"
+          disabled={sending}
+          className="w-full rounded-full border border-gray-300 px-4 py-2 outline-none focus:border-gray-500 disabled:bg-gray-50"
         />
+        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </form>
 
       {/* Liste */}
@@ -82,7 +109,7 @@ export default function Comments({
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2">
                   <span className="text-sm font-semibold">{c.username}</span>
-                  <span className="text-xs text-gray-400">{formatDate(c.timestamp)}</span>
+                  <TimeAgo iso={c.timestamp} />
                 </div>
                 <p className="mt-0.5 whitespace-pre-wrap break-words">{c.text}</p>
               </div>
