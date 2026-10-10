@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import Chat from "@/components/Chat";
 
 type Params = Promise<{ id: string }>;
 
@@ -23,6 +24,12 @@ async function VideoPlayer({ params }: { params: Params }) {
       />
     </video>
   );
+}
+
+// Gibt die Video-ID aus der URL an den Chat weiter
+async function ChatSection({ params }: { params: Params }) {
+  const { id } = await params;
+  return <Chat videoId={id} />;
 }
 
 export default function VideoPage({ params }: { params: Params }) {
@@ -53,22 +60,11 @@ export default function VideoPage({ params }: { params: Params }) {
         </div>
 
         {/* Rechte Spalte: Chat */}
-        <aside className="flex min-h-96 flex-col rounded-lg border border-gray-300 p-4">
-          <div className="flex flex-1 flex-col justify-end gap-3">
-            <div className="max-w-[80%] self-end rounded-2xl bg-gray-200 px-4 py-2">
-              Worum geht es im Video?
-            </div>
-            <div className="max-w-[80%] self-start rounded-2xl border border-gray-300 px-4 py-2">
-              Das Video erklärt …
-            </div>
-          </div>
-
-          <input
-            type="text"
-            placeholder="Frage stellen …"
-            className="mt-4 w-full rounded-full border border-gray-300 px-4 py-2 outline-none focus:border-gray-500"
-          />
-        </aside>
+        <Suspense
+          fallback={<div className="rounded-lg border border-gray-300" />}
+        >
+          <ChatSection params={params} />
+        </Suspense>
       </div>
     </main>
   );
