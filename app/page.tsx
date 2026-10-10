@@ -15,13 +15,22 @@ export default function Home() {
           <Link
             key={vid.id}
             href={`/video/${vid.id}`}
-            className="flex aspect-video items-center justify-center rounded-lg border border-gray-300 bg-gray-50 text-gray-500 transition hover:border-gray-500 hover:bg-gray-100"
+            className="flex aspect-video items-center justify-center text-center rounded-lg border border-gray-300 bg-gray-50 text-gray-500 transition hover:border-gray-500 hover:bg-gray-100"
           >
+            Lecture {vid.id}<br />
             {vid.title}<br />
-            {vid.date}
+            {formatDate(vid.date)}
           </Link>
         ))}
       </div>
     </main>
   );
+}
+
+export function formatDate(date: string | Date): string {
+  return new Date(date).toLocaleDateString("de-CH", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
