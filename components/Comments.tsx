@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { Comment } from "@/lib/db/actions/getcomments";
 import { addComment } from "@/lib/db/actions/putcomment";
 import { formatAbsolute, timeAgo } from "@/lib/timeAgo";
+import SendButton from "@/components/SendButton";
 
 // Shows "5 minutes ago" and refreshes itself every 30 seconds
 function TimeAgo({ iso }: { iso: string | null }) {
@@ -22,7 +23,7 @@ function TimeAgo({ iso }: { iso: string | null }) {
       dateTime={iso}
       title={formatAbsolute(iso)}
       suppressHydrationWarning
-      className="text-xs text-gray-400"
+      className="text-caption text-secondary"
     >
       {timeAgo(iso, now)}
     </time>
@@ -74,44 +75,51 @@ export default function Comments({
   }
 
   return (
-    <section className="rounded-lg border border-gray-300 p-4">
-      <h2 className="mb-4 font-semibold">
-        Kommentare <span className="font-normal text-gray-500">({comments.length})</span>
-      </h2>
+    <section aria-labelledby="comments-heading">
+      <div className="flex items-baseline gap-2">
+        <h2 id="comments-heading" className="text-title">
+          Kommentare
+        </h2>
+        <span className="text-body tabular-nums text-secondary">{comments.length}</span>
+      </div>
 
       {/* Eingabe */}
-      <form onSubmit={handleSubmit} className="mb-6">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Kommentar schreiben …"
-          disabled={sending}
-          className="w-full rounded-full border border-gray-300 px-4 py-2 outline-none focus:border-gray-500 disabled:bg-gray-50"
-        />
-        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      <form onSubmit={handleSubmit} className="mt-6 max-w-[65ch]">
+        <div className="relative">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Kommentar schreiben …"
+            aria-label="Kommentar schreiben"
+            disabled={sending}
+            className="w-full rounded-full bg-raised py-2.5 pl-4 pr-12 text-body text-foreground ring-1 ring-hairline placeholder:text-secondary transition-shadow duration-150 ease-out focus:ring-secondary/60 focus:outline-none disabled:opacity-50"
+          />
+          <SendButton disabled={sending || !input.trim()} label="Kommentar senden" />
+        </div>
+        {error && <p role="alert" className="mt-2 text-small text-danger">{error}</p>}
       </form>
 
       {/* Liste */}
       {comments.length === 0 ? (
-        <p className="text-sm text-gray-400">Noch keine Kommentare.</p>
+        <p className="mt-8 text-body text-secondary">Noch keine Kommentare.</p>
       ) : (
-        <ul className="flex flex-col gap-5">
+        <ul className="mt-4 max-w-[65ch] divide-y divide-hairline">
           {comments.map((c) => (
-            <li key={c.id} className="flex gap-3">
+            <li key={c.id} className="flex gap-3.5 py-5">
               <div
                 aria-hidden
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-200 text-sm font-medium text-gray-700"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-raised text-small font-medium text-foreground ring-1 ring-hairline"
               >
                 {initials(c.username)}
               </div>
 
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="text-sm font-semibold">{c.username}</span>
+                  <span className="text-small font-semibold">{c.username}</span>
                   <TimeAgo iso={c.timestamp} />
                 </div>
-                <p className="mt-0.5 whitespace-pre-wrap break-words">{c.text}</p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-body">{c.text}</p>
               </div>
             </li>
           ))}

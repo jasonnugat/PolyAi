@@ -2,11 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import SendButton from "@/components/SendButton";
 
 // error: true = Fehlermeldung, wird nicht an OpenAI mitgeschickt
 type Message = { role: "user" | "assistant"; content: string; error?: boolean };
 
 const STORAGE_KEY = "polyai-chat";
+
+// Vorschläge für den leeren Chat
+const SUGGESTIONS = [
+  "Worum geht es in dieser Vorlesung?",
+  "Was sind die wichtigsten Begriffe?",
+  "Wo wird das erste Beispiel gerechnet?",
+];
 
 // Springt im Video (id="lecture-video") an die Stelle und spielt ab
 function seekTo(seconds: number) {
@@ -22,6 +30,9 @@ function seekTo(seconds: number) {
 // Findet "[Video 2, 0:12:30]" und auch das alte Format "[0:12:30]"
 const TIMESTAMP = /(\[(?:Video [\w-]+, )?\d+:\d{2}:\d{2}\])/g;
 const TIMESTAMP_PARTS = /^\[(?:Video ([\w-]+), )?(\d+):(\d{2}):(\d{2})\]$/;
+
+const CHIP =
+  "mx-0.5 inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 align-baseline font-mono text-chip text-accent transition-colors duration-150 ease-out hover:bg-accent/15 focus-ring";
 
 export default function Chat({ videoId }: { videoId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -82,12 +93,8 @@ export default function Chat({ videoId }: { videoId: string }) {
 
       if (targetVideo === videoId) {
         return (
-          <button
-            key={i}
-            onClick={() => seekTo(seconds)}
-            className="mx-0.5 rounded bg-blue-50 px-1.5 font-mono text-sm text-blue-700 hover:bg-blue-100"
-          >
-            ▶ {time}
+          <button key={i} onClick={() => seekTo(seconds)} className={CHIP}>
+            <span aria-hidden="true">▶</span> {time}
           </button>
         );
       }
@@ -97,9 +104,9 @@ export default function Chat({ videoId }: { videoId: string }) {
         <button
           key={i}
           onClick={() => router.push(`/video/${targetVideo}?t=${seconds}`)}
-          className="mx-0.5 rounded bg-purple-50 px-1.5 font-mono text-sm text-purple-700 hover:bg-purple-100"
+          className={CHIP}
         >
-          ↗ Video {targetVideo} · {time}
+          <span aria-hidden="true">↗</span> Video {targetVideo} · {time}
         </button>
       );
     });
@@ -111,9 +118,7 @@ export default function Chat({ videoId }: { videoId: string }) {
     if (list) list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
 
-  async function sendMessage(e: React.FormEvent) {
-    e.preventDefault();
-    const question = input.trim();
+  async function send(question: string) {
     if (!question || loading) return;
 
     const newMessages: Message[] = [
@@ -165,30 +170,60 @@ export default function Chat({ videoId }: { videoId: string }) {
     }
   }
 
+  function sendMessage(e: React.FormEvent) {
+    e.preventDefault();
+    send(input.trim());
+  }
+
   return (
-    <aside className="flex h-[32rem] flex-col rounded-lg border border-gray-300 p-4 lg:h-[calc(100vh-7rem)]">
+    <aside
+      className="flex h-[32rem] flex-col overflow-hidden rounded-panel bg-raised ring-1 ring-hairline lg:sticky lg:top-20 lg:h-[calc(100vh-6.5rem)] lg:self-start"
+      aria-labelledby="chat-heading"
+    >
       {/* Kopfzeile */}
-      {messages.length > 0 && (
-        <div className="mb-2 flex justify-end">
+      <div className="flex items-center justify-between border-b border-hairline px-5 py-3.5">
+        <div>
+          <h2 id="chat-heading" className="text-heading">
+            Chat
+          </h2>
+          <p className="text-caption text-secondary">Antwortet mit Sprungmarken ins Video</p>
+        </div>
+        {messages.length > 0 && (
           <button
             onClick={newChat}
             disabled={loading}
-            className="text-sm text-gray-500 hover:text-gray-900 disabled:opacity-50"
+            className="rounded-full px-3 py-1 text-small font-medium text-secondary transition-colors duration-150 ease-out hover:bg-background hover:text-foreground focus-ring disabled:opacity-50"
           >
             Neuer Chat
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Nachrichten (scrollbar, wenn es viele werden) */}
       <div
         ref={listRef}
-        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto"
+        role="log"
+        aria-live="polite"
+        aria-busy={loading}
+        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4"
       >
         {messages.length === 0 && (
-          <p className="m-auto text-center text-sm text-gray-400">
-            Stell eine Frage zur Vorlesung.
-          </p>
+          <div className="m-auto flex w-full max-w-xs flex-col items-center gap-4 text-center">
+            <p className="text-body text-secondary">Stell eine Frage zur Vorlesung.</p>
+            <ul className="flex w-full flex-col gap-2">
+              {SUGGESTIONS.map((s) => (
+                <li key={s}>
+                  <button
+                    onClick={() => send(s)}
+                    disabled={loading}
+                    className="w-full rounded-full bg-background px-4 py-2 text-small text-foreground ring-1 ring-hairline transition-colors duration-150 ease-out hover:ring-secondary/60 focus-ring disabled:opacity-50"
+                  >
+                    {s}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {messages.map((m, i) => (
@@ -196,10 +231,10 @@ export default function Chat({ videoId }: { videoId: string }) {
             key={i}
             className={
               m.role === "user"
-                ? "max-w-[80%] self-end rounded-2xl bg-gray-200 px-4 py-2"
+                ? "max-w-[85%] self-end whitespace-pre-wrap rounded-bubble rounded-br-md bg-foreground px-4 py-2.5 text-body text-background animate-rise"
                 : m.error
-                ? "max-w-[80%] self-start rounded-2xl border border-red-300 bg-red-50 px-4 py-2 text-red-700"
-                : "max-w-[80%] self-start whitespace-pre-wrap rounded-2xl border border-gray-300 px-4 py-2"
+                ? "max-w-[85%] self-start rounded-bubble rounded-bl-md bg-danger-soft px-4 py-2.5 text-body text-danger animate-rise"
+                : "max-w-[92%] self-start whitespace-pre-wrap text-body animate-rise"
             }
           >
             {m.role === "assistant" ? withTimestamps(m.content) : m.content}
@@ -207,22 +242,35 @@ export default function Chat({ videoId }: { videoId: string }) {
         ))}
 
         {loading && (
-          <div className="self-start rounded-2xl border border-gray-300 px-4 py-2 text-gray-400">
-            …
+          <div
+            className="flex items-center gap-1 self-start px-1 py-2"
+            aria-label="Wird geladen …"
+          >
+            {[0, 1, 2].map((n) => (
+              <span
+                key={n}
+                className="h-1.5 w-1.5 rounded-full bg-secondary animate-dot"
+                style={{ animationDelay: `${n * 0.15}s` }}
+              />
+            ))}
           </div>
         )}
       </div>
 
       {/* Eingabe */}
-      <form onSubmit={sendMessage} className="mt-4">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Frage stellen …"
-          disabled={loading}
-          className="w-full rounded-full border border-gray-300 px-4 py-2 outline-none focus:border-gray-500 disabled:bg-gray-50"
-        />
+      <form onSubmit={sendMessage} className="border-t border-hairline p-3">
+        <div className="relative">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Frage stellen …"
+            disabled={loading}
+            aria-label="Frage stellen"
+            className="w-full rounded-full bg-background py-2.5 pl-4 pr-12 text-body text-foreground ring-1 ring-hairline placeholder:text-secondary transition-shadow duration-150 ease-out focus:ring-secondary/60 focus:outline-none disabled:opacity-50"
+          />
+          <SendButton disabled={loading || !input.trim()} label="Frage senden" />
+        </div>
       </form>
     </aside>
   );

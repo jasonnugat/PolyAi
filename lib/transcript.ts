@@ -75,6 +75,21 @@ export function vttToTranscript(vtt: string, blockSeconds = 30): string {
   return lines.join("\n");
 }
 
+// Liest die Dauer (Sekunden) aus public/videos/<id>.vtt: Endzeit des letzten Cues.
+// Gibt null zurück, wenn die Datei fehlt oder keine Zeitangaben enthält.
+export async function loadDuration(id: string): Promise<number | null> {
+  if (!/^[\w-]+$/.test(id)) return null;
+
+  try {
+    const file = path.join(process.cwd(), "public", "videos", `${id}.vtt`);
+    const vtt = await readFile(file, "utf-8");
+    const ends = [...vtt.matchAll(/-->\s*([\d:.]+)/g)].map((m) => toSeconds(m[1]));
+    return ends.length ? Math.max(...ends) : null;
+  } catch {
+    return null;
+  }
+}
+
 // Lädt public/videos/<id>.vtt und gibt das Transkript zurück
 export async function loadTranscript(id: string): Promise<string> {
   if (!/^[\w-]+$/.test(id)) throw new Error("Ungültige Video-ID");
