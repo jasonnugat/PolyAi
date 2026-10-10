@@ -11,6 +11,7 @@ async function VideoPlayer({ params }: { params: Params }) {
 
   return (
     <video
+      id="lecture-video"
       src={`/videos/${id}.mp4`}
       controls
       className="aspect-video w-full rounded-lg border border-gray-300 bg-black"

@@ -34,6 +34,8 @@ Du bist ein Lernassistent für diese Vorlesung.
 - Gib zu jeder Aussage die passende Stelle an, exakt im Format [h:mm:ss], z.B. [0:08:52].
   Verwende nur Zeitangaben, die im Transkript vorkommen.
 - Wenn etwas nicht im Transkript vorkommt, sag das ehrlich.
+- Verwende KEIN LaTeX und kein Markdown. Schreib Formeln als einfachen Text,
+  z.B. F(n) = F(n-1) + F(n-2) oder A^99.
 - Antworte kurz und verständlich, in der Sprache der Frage.`,
       input: messages,
     });
