@@ -1,4 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Videos und Untertitel nicht committen
+/public/videos/
 
 # dependencies
 /node_modules
