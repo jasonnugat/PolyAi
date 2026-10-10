@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { getVideos } from '@/lib/db/getvideos';
 
 // Platzhalter, später kommen die Videos aus Firebase
-const videos = [1, 2, 3, 4, 5, 6];
+const videos = await getVideos();
 
 export default function Home() {
   return (
@@ -11,13 +12,14 @@ export default function Home() {
       </h1>
 
       <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-        {videos.map((id) => (
+        {videos.map((vid) => (
           <Link
-            key={id}
-            href={`/video/${id}`}
+            key={vid.id}
+            href={`/video/${vid.id}`}
             className="flex aspect-video items-center justify-center rounded-lg border border-gray-300 bg-gray-50 text-gray-500 transition hover:border-gray-500 hover:bg-gray-100"
           >
-            Video {id}
+            {vid.title}<br />
+            {vid.date}
           </Link>
         ))}
       </div>
