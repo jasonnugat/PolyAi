@@ -38,10 +38,9 @@ export default function LectureLibrary({ lectures }: { lectures: Lecture[] }) {
     <>
       <div className="library-toolbar">
         <div className="library-toolbar-heading">
-          <h2>All lectures</h2>
-          <span className="lecture-count">
+          <h2 className="lecture-count">
             {lectures.length} {lectures.length === 1 ? "lecture" : "lectures"}
-          </span>
+          </h2>
         </div>
         <div className="lecture-sort">
           <select

@@ -8,6 +8,8 @@ import Icon from "@/components/Icon";
 import { getLecture } from "@/lib/db/actions/getlectures";
 import { formatDate } from "@/lib/formatDate";
 import LecturePlayer from "@/components/LecturePlayer";
+import SummaryPanel from "@/components/SummaryPanel";
+import SummaryText from "@/components/SummaryText";
 
 type Params = Promise<{ id: string }>;
 
@@ -42,15 +44,9 @@ async function SummarySection({ params }: { params: Params }) {
   const summary = await getSummary(Number(id));
 
   return (
-    <section className="panel summary-panel">
-      <div className="panel-heading">
-        <Icon name="document" />
-        <h2 className="panel-title">Summary</h2>
-      </div>
-      <p className="summary-content">
-        {summary || "No summary available yet."}
-      </p>
-    </section>
+    <SummaryPanel key={id}>
+      <SummaryText text={summary} videoId={id} />
+    </SummaryPanel>
   );
 }
 
